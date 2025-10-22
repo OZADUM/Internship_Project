@@ -1,4 +1,4 @@
 allure-behave
-behave
-selenium
-webdriver-manager
+behave>=1.2.6
+selenium>=4.22
+webdriver-manager>=4.0.2
