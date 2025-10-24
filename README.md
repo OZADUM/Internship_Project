@@ -1,22 +1,13 @@
-# Careerist QA Automation Internship — Reelly
+# Internship_Project
 
-This is the base automation repo for the internship tasks.
+## Quickstart
 
-## Setup
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+# Activate venv
+source venv/bin/activate
 
-## Run tests
-```bash
+# Run all tests
 python -m behave -f pretty
-```
 
-## Repo structure
-- `app/` — Application bootstrap
-- `pages/` — Page Objects (POM)
-- `features/tests/` — Behave feature files (BDD)
-- `features/steps/` — Step definitions
-- `features/environment.py` — Behave hooks (driver setup)
+# If Reelly base needs to point to soft env:
+python -m behave -f pretty -D reelly_base="https://soft.reelly.io"
