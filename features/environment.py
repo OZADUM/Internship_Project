@@ -1,4 +1,4 @@
-cat > features/environment.py <<'EOF'
+cat > features/environment.py <<'PY'
 import os
 from selenium import webdriver
 
@@ -28,7 +28,7 @@ def before_all(context):
     if browser == "firefox":
         options = FirefoxOptions()
         if headless:
-            options.headless = True  # or options.add_argument("-headless")
+            options.headless = True  # or: options.add_argument("-headless")
         # Helpful for headless UIs to render consistently
         options.set_preference("layout.css.devPixelsPerPx", "1.0")
 
@@ -48,10 +48,15 @@ def before_all(context):
         service = ChromeService(ChromeDriverManager().install())
         context.driver = webdriver.Chrome(service=service, options=options)
 
-    context.driver.maximize_window()
+    try:
+        context.driver.maximize_window()
+    except Exception:
+        # In strict headless, maximize_window may no-op; ignore
+        pass
+
     context.app = Application(context.driver)
 
 
 def after_all(context):
     context.driver.quit()
-EOF
+PY
