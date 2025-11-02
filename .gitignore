@@ -22,3 +22,9 @@ reports/
 # Env/config
 .env
 .env.*
+
+# local secrets
+.env
+
+# local secrets
+.env
