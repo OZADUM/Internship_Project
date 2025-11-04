@@ -32,3 +32,4 @@ reports/
 # Allure artifacts
 allure-results/
 allure-report/
+stdout
