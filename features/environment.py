@@ -1,4 +1,6 @@
 import os
+from datetime import datetime
+from pathlib import Path
 from selenium import webdriver
 
 # Local Chrome
@@ -17,13 +19,15 @@ from selenium.webdriver.edge.options import Options as EdgeOptions
 
 from app.application import Application
 
-# Load .env if exists
+# Load .env if present
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except Exception:
     pass
 
+
+# ---------------- Helper functions ----------------
 
 def _str2bool(v, default=False):
     if v is None:
@@ -36,6 +40,8 @@ def _userdata(context, key, default=None):
     return ud.get(key, os.getenv(key.upper(), default))
 
 
+# ---------------- Browser setup ----------------
+
 def before_all(context):
     browser = _userdata(context, "browser", "chrome").lower()
     headless = _str2bool(_userdata(context, "headless"), default=False)
@@ -45,7 +51,7 @@ def before_all(context):
     if use_bs:
         username = os.getenv("BROWSERSTACK_USERNAME")
         access_key = os.getenv("BROWSERSTACK_ACCESS_KEY")
-        assert username and access_key, "❌ Set BROWSERSTACK_USERNAME and BROWSERSTACK_ACCESS_KEY in .env"
+        assert username and access_key, "❌ Set BrowserStack credentials in .env"
 
         os_name = _userdata(context, "os", "Windows")
         os_version = _userdata(context, "os_version", "11")
@@ -62,7 +68,6 @@ def before_all(context):
             "seleniumVersion": "4.20.0",
         }
 
-        # Select browser options
         if browser == "firefox":
             options = FirefoxOptions()
             if headless:
@@ -81,7 +86,7 @@ def before_all(context):
                 options.add_argument("--window-size=1366,900")
             options.set_capability("browserName", "Edge")
 
-        else:  # default Chrome
+        else:
             options = ChromeOptions()
             if headless:
                 options.add_argument("--headless=new")
@@ -95,8 +100,7 @@ def before_all(context):
         hub = f"https://{username}:{access_key}@hub-cloud.browserstack.com/wd/hub"
         context.driver = webdriver.Remote(command_executor=hub, options=options)
 
-    else:
-        # -------- Local browsers --------
+    else:  # Local browsers
         if browser == "firefox":
             options = FirefoxOptions()
             if headless:
@@ -104,7 +108,7 @@ def before_all(context):
             service = FirefoxService(GeckoDriverManager().install())
             context.driver = webdriver.Firefox(service=service, options=options)
 
-        else:  # default Chrome
+        else:  # Chrome default
             options = ChromeOptions()
             if headless:
                 options.add_argument("--headless=new")
@@ -125,7 +129,7 @@ def before_all(context):
 
 
 def before_scenario(context, scenario):
-    """Name BrowserStack sessions by scenario."""
+    """Name BrowserStack session after the scenario."""
     try:
         name = f"{scenario.feature.name} — {scenario.name}"
         context.driver.execute_script(
@@ -135,16 +139,42 @@ def before_scenario(context, scenario):
         pass
 
 
-def after_step(context, step):
-    """Mark session failed on step failure."""
+# ---------------- Screenshot on Failure ----------------
+
+SCREENSHOT_DIR = Path("screenshots")
+
+def _ensure_screenshot_dir():
+    SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
+
+def _take_screenshot(context, name="failed-step"):
+    _ensure_screenshot_dir()
+    ts = datetime.now().strftime("%Y%m%d-%H%M%S")
+    safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in name)[:80]
+    path = SCREENSHOT_DIR / f"{ts}-{safe}.png"
+
     try:
-        if step.status == "failed":
-            context.driver.execute_script(
-                'browserstack_executor: {"action":"setSessionStatus", '
-                '"arguments":{"status":"failed","reason":"Step failed"}}'
-            )
+        context.driver.save_screenshot(str(path))
+    except Exception:
+        return
+
+    # Attach to Allure if available
+    try:
+        from allure_commons.types import AttachmentType
+        from allure_commons._allure import attach as allure_attach
+        allure_attach.file(str(path), name=f"screenshot-{safe}", attachment_type=AttachmentType.PNG)
     except Exception:
         pass
+
+
+def after_step(context, step):
+    if step.status == "failed":
+        _take_screenshot(context, step.name)
+        try:
+            context.driver.execute_script(
+                'browserstack_executor: {"action":"setSessionStatus","arguments":{"status":"failed","reason":"Step failed"}}'
+            )
+        except Exception:
+            pass
 
 
 def after_all(context):
